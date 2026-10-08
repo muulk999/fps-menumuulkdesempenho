@@ -1,0 +1,466 @@
+-- Garante que o jogo carregou completamente
+if not game:IsLoaded() then
+    game.Loaded:Wait()
+end
+
+-- Serviços necessários
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local Lighting = game:GetService("Lighting")
+local CoreGui = game:GetService("CoreGui")
+local Workspace = game:GetService("Workspace")
+
+local LocalPlayer = Players.LocalPlayer
+
+-- Carrega a Rayfield UI Library
+local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
+
+-- Cria a Janela Principal com o novo nome
+local Window = Rayfield:CreateWindow({
+    Name = "@MUULK MENU - ROBLOX LITE",
+    LoadingTitle = "Carregando @MUULK MENU...",
+    LoadingSubtitle = "by Assistant",
+    ConfigurationSaving = {
+        Enabled = false,
+        FolderName = nil,
+        FileName = "MuulkMenuConfig"
+    },
+    Discord = {
+        Enabled = false,
+        Invite = "noauth",
+        RememberJoins = true
+    },
+    KeySystem = false,
+})
+
+-- Criação da Aba de Otimização
+local Tab = Window:CreateTab("Otimização Avançada", "sliders")
+
+-- Variáveis de controle
+local fpsConnection = nil
+local fpsLabel = nil
+local pixelationConnection = nil
+local particleConnection = nil
+local adConnection = nil
+local lightConnection = nil
+
+-- ================= CONFIGURAÇÃO DE FPS =================
+local function toggleFpsCounter(state)
+    if state then
+        if not fpsLabel then
+            local screenGui = Instance.new("ScreenGui")
+            screenGui.Name = "FpsCounterGui"
+            screenGui.Parent = CoreGui
+            screenGui.IgnoreGuiInset = true
+
+            fpsLabel = Instance.new("TextLabel")
+            fpsLabel.Name = "FpsLabel"
+            fpsLabel.Parent = screenGui
+            fpsLabel.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+            fpsLabel.BackgroundTransparency = 0.5
+            fpsLabel.Position = UDim2.new(0.5, -50, 0, 5)
+            fpsLabel.Size = UDim2.new(0, 100, 0, 25)
+            fpsLabel.Font = Enum.Font.SourceSansBold
+            fpsLabel.TextColor3 = Color3.fromRGB(0, 255, 0)
+            fpsLabel.TextSize = 16
+            fpsLabel.Text = "FPS: 0"
+
+            local lastUpdate = tick()
+            local frameCount = 0
+            
+            fpsConnection = RunService.RenderStepped:Connect(function()
+                frameCount = frameCount + 1
+                local now = tick()
+                if now - lastUpdate >= 1 then
+                    local fps = math.floor(frameCount / (now - lastUpdate))
+                    fpsLabel.Text = "FPS: " .. tostring(fps)
+                    frameCount = 0
+                    lastUpdate = now
+                end
+            end)
+        else
+            fpsLabel.Parent.Enabled = true
+        end
+    else
+        if fpsLabel then
+            fpsLabel.Parent.Enabled = false
+            if fpsConnection then
+                fpsConnection:Disconnect()
+                fpsConnection = nil
+            end
+        end
+    end
+end
+
+-- ================= FUNÇÕES MODULARES =================
+
+-- 1. Texturas e Cor Cinza Padrão
+local function toggleGreyTextures(state)
+    for _, v in ipairs(Workspace:GetDescendants()) do
+        if not v:IsDescendantOf(Players) then
+            if v:IsA("BasePart") then
+                if state then
+                    v.Material = Enum.Material.SmoothPlastic
+                    v.Color = Color3.fromRGB(163, 162, 165)
+                    v.Reflectance = 0
+                else
+                    v.Material = Enum.Material.Plastic
+                end
+            elseif v:IsA("Texture") or v:IsA("Decal") then
+                v.Transparency = state and 1 or 0
+            end
+        end
+    end
+end
+
+-- 2. Remover Roupas e Acessórios dos Jogadores (Mantendo só o corpo base)
+local function optimizePlayerClothing(state)
+    local function cleanCharacter(char)
+        for _, child in ipairs(char:GetChildren()) do
+            if state then
+                if child:IsA("Clothing") or child:IsA("Accessory") or child:IsA("ShirtGraphic") or child:IsA("WrapLayer") or child:IsA("WrapDeformer") then
+                    child:Destroy()
+                end
+            end
+        end
+    end
+
+    for _, player in ipairs(Players:GetPlayers()) do
+        if player.Character then
+            cleanCharacter(player.Character)
+        end
+    end
+
+    if state and not _G.ClothingConnection then
+        _G.ClothingConnection = Players.PlayerAdded:Connect(function(player)
+            player.CharacterAdded:Connect(function(char)
+                task.wait(0.5)
+                cleanCharacter(char)
+            end)
+        end)
+    end
+end
+
+-- 3. Remover Anúncios do Jogo (Ads) [Seguro contra sumir com avatares]
+local function toggleRemoveAds(state)
+    local function cleanAds(parent)
+        for _, v in ipairs(parent:GetDescendants()) do
+            if not v:IsDescendantOf(Players) then
+                if v:IsA("SurfaceGui") or v:IsA("BillboardGui") then
+                    local nameLower = string.lower(v.Name)
+                    if string.find(nameLower, "ad") or string.find(nameLower, "sponsor") or string.find(nameLower, "banner") or string.find(nameLower, "promo") or string.find(nameLower, "donate") then
+                        if state then
+                            v:Destroy()
+                        end
+                    end
+                elseif v:IsA("BasePart") then
+                    local nameLower = string.lower(v.Name)
+                    if (string.find(nameLower, "advertisement") or string.find(nameLower, "billboardad") or string.find(nameLower, "sponsorboard")) then
+                        if state then
+                            v:Destroy()
+                        end
+                    end
+                end
+            end
+        end
+    end
+
+    cleanAds(Workspace)
+    cleanAds(CoreGui)
+
+    if state then
+        if not adConnection then
+            adConnection = Workspace.DescendantAdded:Connect(function(v)
+                if not v:IsDescendantOf(Players) then
+                    if v:IsA("SurfaceGui") or v:IsA("BillboardGui") then
+                        local nameLower = string.lower(v.Name)
+                        if string.find(nameLower, "ad") or string.find(nameLower, "sponsor") or string.find(nameLower, "banner") or string.find(nameLower, "promo") or string.find(nameLower, "donate") then
+                            v:Destroy()
+                        end
+                    end
+                end
+            end)
+        end
+    else
+        if adConnection then
+            adConnection:Disconnect()
+            adConnection = nil
+        end
+    end
+end
+
+-- 4. Remover Todas as Luzes, Raios de Sol e Brilhos de Objetos
+local function toggleRemoveLights(state)
+    local function cleanLighting(parent)
+        for _, v in ipairs(parent:GetDescendants()) do
+            if not v:IsDescendantOf(Players) then
+                if v:IsA("PointLight") or v:IsA("SpotLight") or v:IsA("SurfaceLight") or v:IsA("SunRaysEffect") or v:IsA("BloomEffect") or v:IsA("DepthOfFieldEffect") or v:IsA("ColorCorrectionEffect") then
+                    if state then
+                        v.Enabled = false
+                        v:Destroy()
+                    end
+                end
+            end
+        end
+    end
+
+    cleanLighting(Workspace)
+    cleanLighting(Lighting)
+
+    if state then
+        if not lightConnection then
+            lightConnection = Workspace.DescendantAdded:Connect(function(v)
+                if not v:IsDescendantOf(Players) then
+                    if v:IsA("PointLight") or v:IsA("SpotLight") or v:IsA("SurfaceLight") or v:IsA("SunRaysEffect") or v:IsA("BloomEffect") or v:IsA("DepthOfFieldEffect") or v:IsA("ColorCorrectionEffect") then
+                        v.Enabled = false
+                        v:Destroy()
+                    end
+                end
+            end)
+        end
+    else
+        if lightConnection then
+            lightConnection:Disconnect()
+            lightConnection = nil
+        end
+    end
+end
+
+-- 5. Remover Sombras do Jogo
+local function toggleRemoveShadows(state)
+    if state then
+        Lighting.GlobalShadows = false
+        Lighting.OutdoorAmbient = Color3.fromRGB(150, 150, 150)
+        for _, v in ipairs(Workspace:GetDescendants()) do
+            if not v:IsDescendantOf(Players) and v:IsA("BasePart") then
+                v.CastShadow = false
+            end
+        end
+    else
+        Lighting.GlobalShadows = true
+        for _, v in ipairs(Workspace:GetDescendants()) do
+            if not v:IsDescendantOf(Players) and v:IsA("BasePart") then
+                v.CastShadow = true
+            end
+        end
+    end
+end
+
+-- 6. Remover Partículas do Mapa
+local function toggleRemoveParticles(state)
+    local function processParticles(parent)
+        for _, v in ipairs(parent:GetDescendants()) do
+            if not v:IsDescendantOf(Players) then
+                if v:IsA("ParticleEmitter") or v:IsA("Fire") or v:IsA("Smoke") or v:IsA("Sparkles") or v:IsA("Trail") or v:IsA("Beam") then
+                    if state then
+                        v.Enabled = false
+                        v:Destroy()
+                    end
+                end
+            end
+        end
+    end
+
+    processParticles(Workspace)
+    processParticles(Lighting)
+
+    if state then
+        if not particleConnection then
+            particleConnection = Workspace.DescendantAdded:Connect(function(v)
+                if not v:IsDescendantOf(Players) then
+                    if v:IsA("ParticleEmitter") or v:IsA("Fire") or v:IsA("Smoke") or v:IsA("Sparkles") or v:IsA("Trail") or v:IsA("Beam") then
+                        v.Enabled = false
+                        v:Destroy()
+                    end
+                end
+            end)
+        end
+    else
+        if particleConnection then
+            particleConnection:Disconnect()
+            particleConnection = nil
+        end
+    end
+end
+
+-- 7. Remover Objetos com Física (Partes não ancoradas que causam peso)
+local function togglePhysicsObjects(state)
+    for _, v in ipairs(Workspace:GetDescendants()) do
+        if not v:IsDescendantOf(Players) then
+            if v:IsA("BasePart") and not v.Anchored then
+                if state then
+                    v.Transparency = 1
+                    v.CanCollide = false
+                else
+                    v.Transparency = 0
+                    v.CanCollide = true
+                end
+            end
+        end
+    end
+end
+
+-- 8. Remover Objetos 3D / Animações de Cenário
+local function toggleMovingObjects(state)
+    for _, v in ipairs(Workspace:GetDescendants()) do
+        if not v:IsDescendantOf(Players) then
+            if v:IsA("AnimationController") or v:IsA("Animator") then
+                if state then
+                    v:Destroy()
+                end
+            end
+        end
+    end
+end
+
+-- 9. Reduzir Renderização / Gráficos Globais e Iluminação
+local function toggleRenderingReduction(state)
+    if state then
+        settings().Rendering.QualityLevel = Enum.QualityLevel.Level01
+        Workspace.CurrentCamera.CullingEnabled = true
+        Lighting.FogEnd = 9e9
+        Lighting.Brightness = 1
+        for _, v in ipairs(Lighting:GetChildren()) do
+            if not v:IsDescendantOf(Players) then
+                if v:IsA("PostEffect") or v:IsA("Sky") or v:IsA("Atmosphere") or v:IsA("BlurEffect") or v:IsA("SunRaysEffect") then
+                    v.Enabled = false
+                end
+            end
+        end
+    else
+        settings().Rendering.QualityLevel = Enum.QualityLevel.Automatic
+    end
+end
+
+-- 10. Diminuir Resolução de Pixel (Objetos e Tela)
+local function togglePixelResolution(state)
+    if state then
+        pcall(function()
+            settings().Rendering.EagerBulkExecution = false
+        end)
+        pixelationConnection = RunService.RenderStepped:Connect(function()
+            local cam = Workspace.CurrentCamera
+            if cam then
+                cam.FieldOfView = 55
+            end
+        end)
+    else
+        if pixelationConnection then
+            pixelationConnection:Disconnect()
+            pixelationConnection = nil
+        end
+        local cam = Workspace.CurrentCamera
+        if cam then
+            cam.FieldOfView = 70
+        end
+    end
+end
+
+-- ================= CRIAÇÃO DOS BOTÕES NO RAYFIELD =================
+
+Tab:CreateToggle({
+    Name = "Mostrar FPS no Topo",
+    CurrentValue = false,
+    Flag = "FpsToggle",
+    Callback = function(Value)
+        toggleFpsCounter(Value)
+    end,
+})
+
+Tab:CreateToggle({
+    Name = "Tirar Texturas (Estilo Cinza Padrão)",
+    CurrentValue = false,
+    Flag = "TextureToggle",
+    Callback = function(Value)
+        toggleGreyTextures(Value)
+    end,
+})
+
+Tab:CreateToggle({
+    Name = "Remover Roupas dos Jogadores (Deixa só o corpo)",
+    CurrentValue = false,
+    Flag = "ClothingToggle",
+    Callback = function(Value)
+        optimizePlayerClothing(Value)
+    end,
+})
+
+Tab:CreateToggle({
+    Name = "Remover Todas as Luzes e Brilhos",
+    CurrentValue = false,
+    Flag = "LightToggle",
+    Callback = function(Value)
+        toggleRemoveLights(Value)
+    end,
+})
+
+Tab:CreateToggle({
+    Name = "Remover Sombras do Jogo",
+    CurrentValue = false,
+    Flag = "ShadowToggle",
+    Callback = function(Value)
+        toggleRemoveShadows(Value)
+    end,
+})
+
+Tab:CreateToggle({
+    Name = "Remover Anúncios do Jogo (Ads)",
+    CurrentValue = false,
+    Flag = "AdToggle",
+    Callback = function(Value)
+        toggleRemoveAds(Value)
+    end,
+})
+
+Tab:CreateToggle({
+    Name = "Remover Partículas do Mapa",
+    CurrentValue = false,
+    Flag = "ParticleToggle",
+    Callback = function(Value)
+        toggleRemoveParticles(Value)
+    end,
+})
+
+Tab:CreateToggle({
+    Name = "Remover Objetos com Física",
+    CurrentValue = false,
+    Flag = "PhysicsToggle",
+    Callback = function(Value)
+        togglePhysicsObjects(Value)
+    end,
+})
+
+Tab:CreateToggle({
+    Name = "Remover Objetos 3D / Movimentos",
+    CurrentValue = false,
+    Flag = "MovingToggle",
+    Callback = function(Value)
+        toggleMovingObjects(Value)
+    end,
+})
+
+Tab:CreateToggle({
+    Name = "Reduzir Renderização e Gráficos",
+    CurrentValue = false,
+    Flag = "RenderToggle",
+    Callback = function(Value)
+        toggleRenderingReduction(Value)
+    end,
+})
+
+Tab:CreateToggle({
+    Name = "Diminuir Resolução de Pixel (Objetos e Tela)",
+    CurrentValue = false,
+    Flag = "PixelToggle",
+    Callback = function(Value)
+        togglePixelResolution(Value)
+    end,
+})
+
+-- Notificação inicial
+Rayfield:Notify({
+    Title = "@MUULK MENU Carregado!",
+    Content = "Painel Roblox Lite atualizado com sucesso.",
+    Duration = 5,
+    Image = "check",
+})
